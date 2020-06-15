@@ -15,7 +15,7 @@ namespace nucheck
     {
         static async Task Main(string[] args)
         {
-            XmlDataDocument doc = new XmlDataDocument();
+            XmlDocument doc = new XmlDocument();
             Console.WriteLine(args[0]);
             FileStream fs = new FileStream(args[0], FileMode.Open, FileAccess.Read);
 
