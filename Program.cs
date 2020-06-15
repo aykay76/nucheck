@@ -16,6 +16,7 @@ namespace nucheck
         static async Task Main(string[] args)
         {
             XmlDataDocument doc = new XmlDataDocument();
+            Console.WriteLine(args[0]);
             FileStream fs = new FileStream(args[0], FileMode.Open, FileAccess.Read);
 
             doc.Load(fs);
@@ -24,41 +25,46 @@ namespace nucheck
             for (int i = 0; i < nodes.Count; i++)
             {
                 string packageName = nodes[i].Attributes.GetNamedItem("Include").Value;
-                Version packageVersion = Version.Parse(nodes[i].Attributes.GetNamedItem("Version").Value);
-                List<Version> allTheVersions = new List<Version>();
-
-                HttpClient client = new HttpClient();
-                HttpResponseMessage message = await client.GetAsync($"https://api-v2v3search-0.nuget.org/search/query?q=packageid:{packageName.ToLowerInvariant()}&ignoreFilter=true");
-                string json = await message.Content.ReadAsStringAsync();
-
-                JsonDocument packageDoc = await System.Text.Json.JsonDocument.ParseAsync(await message.Content.ReadAsStreamAsync());
-                JsonElement root = packageDoc.RootElement;
-                ObjectEnumerator oe = root.EnumerateObject();
-                while (oe.MoveNext())
+                Console.WriteLine(packageName);
+                Version packageVersion;
+                if (nodes[i].Attributes.GetNamedItem("Version") != null)
                 {
-                    if (oe.Current.Name == "data")
+                    Version.TryParse(nodes[i].Attributes.GetNamedItem("Version").Value, out packageVersion);
+                    List<Version> allTheVersions = new List<Version>();
+
+                    HttpClient client = new HttpClient();
+                    HttpResponseMessage message = await client.GetAsync($"https://api-v2v3search-0.nuget.org/search/query?q=packageid:{packageName.ToLowerInvariant()}&ignoreFilter=true");
+                    string json = await message.Content.ReadAsStringAsync();
+
+                    JsonDocument packageDoc = await System.Text.Json.JsonDocument.ParseAsync(await message.Content.ReadAsStreamAsync());
+                    JsonElement root = packageDoc.RootElement;
+                    ObjectEnumerator oe = root.EnumerateObject();
+                    while (oe.MoveNext())
                     {
-                        ArrayEnumerator ae = oe.Current.Value.EnumerateArray();
-                        while (ae.MoveNext())
+                        if (oe.Current.Name == "data")
                         {
-                            ObjectEnumerator re = ae.Current.EnumerateObject();
-                            while (re.MoveNext())
+                            ArrayEnumerator ae = oe.Current.Value.EnumerateArray();
+                            while (ae.MoveNext())
                             {
-                                if (re.Current.Name == "Version")
+                                ObjectEnumerator re = ae.Current.EnumerateObject();
+                                while (re.MoveNext())
                                 {
-                                    Version v;
-                                    if (Version.TryParse(re.Current.Value.GetString(), out v))
+                                    if (re.Current.Name == "Version")
                                     {
-                                        allTheVersions.Add(v);
+                                        Version v;
+                                        if (Version.TryParse(re.Current.Value.GetString(), out v))
+                                        {
+                                            allTheVersions.Add(v);
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        var newerVersions = allTheVersions.Where(ver => ver.CompareTo(packageVersion) > 0);
-                        foreach (Version newerVersion in newerVersions)
-                        {
-                            Console.WriteLine($"{packageName} - {newerVersion}");
+                            var newerVersions = allTheVersions.Where(ver => ver.CompareTo(packageVersion) > 0);
+                            foreach (Version newerVersion in newerVersions)
+                            {
+                                Console.WriteLine($"{packageName} - {newerVersion}");
+                            }
                         }
                     }
                 }
